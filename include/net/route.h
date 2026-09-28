@@ -139,12 +139,6 @@ static inline struct rtable *__ip_route_output_key(struct net *net,
 
 struct rtable *ip_route_output_flow(struct net *, struct flowi4 *flp,
 				    const struct sock *sk);
-struct rtable *ip_route_output_tunnel(struct sk_buff *skb,
-				      struct net_device *dev,
-				      struct net *net, __be32 *saddr,
-				      const struct ip_tunnel_info *info,
-				      u8 protocol, bool use_cache);
-
 struct dst_entry *ipv4_blackhole_route(struct net *net,
 				       struct dst_entry *dst_orig);
 
@@ -325,8 +319,7 @@ static inline struct rtable *ip_route_connect(struct flowi4 *fl4, __be32 dst,
 		if (IS_ERR(rt))
 			return rt;
 		ip_rt_put(rt);
-		flowi4_update_output(fl4, oif, fl4->flowi4_tos, fl4->daddr,
-				     fl4->saddr);
+		flowi4_update_output(fl4, oif, fl4->daddr, fl4->saddr);
 	}
 	security_sk_classify_flow(sk, flowi4_to_flowi_common(fl4));
 	return ip_route_output_flow(net, fl4, sk);
@@ -341,8 +334,7 @@ static inline struct rtable *ip_route_newports(struct flowi4 *fl4, struct rtable
 		fl4->fl4_dport = dport;
 		fl4->fl4_sport = sport;
 		ip_rt_put(rt);
-		flowi4_update_output(fl4, sk->sk_bound_dev_if,
-				     RT_CONN_FLAGS(sk), fl4->daddr,
+		flowi4_update_output(fl4, sk->sk_bound_dev_if, fl4->daddr,
 				     fl4->saddr);
 		security_sk_classify_flow(sk, flowi4_to_flowi_common(fl4));
 		return ip_route_output_flow(sock_net(sk), fl4, sk);
