@@ -13,23 +13,44 @@ DEFCONFIG="gki_defconfig"
 
 download_clang() {
     local clang_bin="$TOOLCHAIN_DIR/bin/clang"
-    local clang_url="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/emu-34-2-release/clang-r487747c.tar.gz"
+    local repo_url="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86"
+    local branch="android14-release"
+    local tmp="$WORKROOT/clang-repo"
 
     if [ -f "$clang_bin" ]; then
         echo "==> [Clang Check] Clang r487747c is already present in $TOOLCHAIN_DIR"
-    else
-        echo "==> [Clang Check] Downloading Clang..."
-        mkdir -p "$TOOLCHAIN_DIR"
-        
-        echo "==> Downloading and extracting archive..."
-        curl -sSL "$clang_url" | tar -xz -C "$TOOLCHAIN_DIR"
-        
-        if [ -f "$clang_bin" ]; then
-            echo "==> [Clang Check] Successfully downloaded and installed to $TOOLCHAIN_DIR"
-        else
-            echo "==> [Error] Failed to install Clang!"
-            exit 1
+        return 0
+    fi
+
+    echo "==> [Clang Check] Downloading Clang (git sparse checkout)..."
+    rm -rf "$TOOLCHAIN_DIR" "$tmp"
+    mkdir -p "$(dirname "$TOOLCHAIN_DIR")"
+
+    local ok=0
+    for i in 1 2 3 4 5; do
+        echo "==> Attempt $i/5"
+        if git clone --depth 1 --filter=blob:none --sparse -b "$branch" "$repo_url" "$tmp" \
+           && git -C "$tmp" sparse-checkout set clang-r487747c; then
+            ok=1
+            break
         fi
+        rm -rf "$tmp"
+        sleep 10
+    done
+
+    if [ "$ok" -ne 1 ]; then
+        echo "==> [Error] Could not clone Clang!"
+        exit 1
+    fi
+
+    mv "$tmp/clang-r487747c" "$TOOLCHAIN_DIR"
+    rm -rf "$tmp"
+
+    if [ -f "$clang_bin" ]; then
+        echo "==> [Clang Check] Successfully installed to $TOOLCHAIN_DIR"
+    else
+        echo "==> [Error] Failed to install Clang!"
+        exit 1
     fi
 }
 

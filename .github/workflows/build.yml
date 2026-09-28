@@ -30,7 +30,15 @@ jobs:
       - name: Make build script executable
         run: chmod +x build.sh
 
+      - name: Cache Clang toolchain
+        id: clang-cache
+        uses: actions/cache@v4
+        with:
+          path: toolchains/r487747c
+          key: clang-r487747c-v1
+
       - name: Download and setup toolchain
+        if: steps.clang-cache.outputs.cache-hit != 'true'
         run: ./build.sh --tool
 
       - name: Build Kernel
