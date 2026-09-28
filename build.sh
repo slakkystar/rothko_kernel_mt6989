@@ -10,6 +10,8 @@ export SOURCE_DATE_EPOCH=$(date +%s)
 export LLVM=1
 export CROSS_COMPILE=aarch64-linux-gnu-
 DEFCONFIG="gki_defconfig"
+KSU="${KSU:-"true"}"
+SUSFS="${SUSFS:-"true"}"
 
 download_clang() {
     local clang_bin="$TOOLCHAIN_DIR/bin/clang"
@@ -93,6 +95,26 @@ mkdir -p "$OUT_DIR"
 echo "==> Generating configuration ($DEFCONFIG)..."
 make O="$OUT_DIR" "$DEFCONFIG"
 [ -n "$POST_DEFCONFIG_CMDS" ] && eval "$POST_DEFCONFIG_CMDS"
+
+FRAGMENTS=()
+
+if [ "$KSU" = "true" ]; then
+    echo "==> KernelSU enabled: adding kernelsu.fragment"
+    FRAGMENTS+=("arch/arm64/configs/kernelsu.fragment")
+    
+    if [ "$SUSFS" = "true" ]; then
+        echo "==> SuSFS enabled: adding susfs.fragment"
+        FRAGMENTS+=("arch/arm64/configs/susfs.fragment")
+    fi
+else
+    echo "==> KernelSU disabled: skipping both KSU and SuSFS fragments"
+fi
+
+if [ ${#FRAGMENTS[@]} -gt 0 ]; then
+    echo "==> Merging fragments: ${FRAGMENTS[*]}"
+    ./scripts/kconfig/merge_config.sh -m -O "$OUT_DIR" "$OUT_DIR/.config" "${FRAGMENTS[@]}"
+    make O="$OUT_DIR" olddefconfig
+fi
 
 if [ -n "$LTO" ]; then
     echo "==> Applying LTO=$LTO"

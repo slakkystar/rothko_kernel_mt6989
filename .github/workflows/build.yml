@@ -2,6 +2,15 @@ name: Build Android Kernel 6.1
 
 on:
   workflow_dispatch:
+    inputs:
+      KSU:
+        description: 'Add KernelSU support'
+        type: boolean
+        default: true
+      SUSFS:
+        description: 'Add SuSFS support'
+        type: boolean
+        default: true
 
 jobs:
   build:
@@ -25,7 +34,8 @@ jobs:
             crossbuild-essential-arm64 \
             curl \
             tar \
-            git
+            git \
+            dwarves
 
       - name: Make build script executable
         run: chmod +x build.sh
@@ -42,7 +52,15 @@ jobs:
         run: ./build.sh --tool
 
       - name: Build Kernel
-        run: ./build.sh
+        env:
+          KSU: ${{ inputs.KSU }}
+          SUSFS: ${{ inputs.SUSFS }}
+        run: |
+          if [[ "$KSU" == "true" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/refs/heads/main/kernel/setup.sh" | bash -s main
+          fi
+
+          ./build.sh
 
       - name: Upload Kernel Image
         uses: actions/upload-artifact@v4
@@ -56,4 +74,3 @@ jobs:
         with:
           name: build.log
           path: build.log
-          
