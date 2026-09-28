@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 #ifdef OPENSSL_IS_BORINGSSL
 		ERR(1, "BoringSSL does not support extracting from PKCS#11");
 		exit(1);
-#else
+#elif defined(USE_PKCS11_ENGINE)
 		ENGINE *e;
 		struct {
 			const char *cert_id;
@@ -146,11 +146,16 @@ int main(int argc, char **argv)
 			drain_openssl_errors();
 		else
 			ERR(1, "ENGINE_init");
+
 		if (key_pass)
 			ERR(!ENGINE_ctrl_cmd_string(e, "PIN", key_pass, 0), "Set PKCS#11 PIN");
+
 		ENGINE_ctrl_cmd(e, "LOAD_CERT_CTRL", 0, &parms, NULL, 1);
 		ERR(!parms.cert, "Get X.509 from PKCS#11");
 		write_cert(parms.cert);
+#else
+		ERR(1, "PKCS#11 engine support is disabled in this build");
+		exit(1);
 #endif
 	} else {
 		BIO *b;
