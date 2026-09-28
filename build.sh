@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 export ARCH=arm64
 export SUBARCH=arm64
@@ -68,12 +68,45 @@ fi
 
 export PATH="$TOOLCHAIN_DIR/bin:$PATH"
 
-echo "==> Generating configuration ($DEFCONFIG)..."
+BUILD_CONFIG="${BUILD_CONFIG:-build.config.gki.aarch64}"
+export ROOT_DIR="$WORKROOT"
+export KERNEL_DIR="."
+
+if [ ! -f "$ROOT_DIR/$BUILD_CONFIG" ]; then
+    echo "==> [Error] $BUILD_CONFIG not found in $ROOT_DIR"
+    exit 1
+fi
+
+check_defconfig() { :; }
+
+echo "==> Loading $BUILD_CONFIG..."
+set -a
+. "$ROOT_DIR/$BUILD_CONFIG"
+set +a
+
+DEFCONFIG="${DEFCONFIG:-gki_defconfig}"
+echo "==> DEFCONFIG=$DEFCONFIG LTO=${LTO:-default} MAKE_GOALS=${MAKE_GOALS:-<default>}"
+
 mkdir -p "$OUT_DIR"
-make O="$OUT_DIR" $DEFCONFIG
+
+[ -n "$PRE_DEFCONFIG_CMDS" ] && eval "$PRE_DEFCONFIG_CMDS"
+echo "==> Generating configuration ($DEFCONFIG)..."
+make O="$OUT_DIR" "$DEFCONFIG"
+[ -n "$POST_DEFCONFIG_CMDS" ] && eval "$POST_DEFCONFIG_CMDS"
+
+if [ -n "$LTO" ]; then
+    echo "==> Applying LTO=$LTO"
+    CFG="$WORKROOT/scripts/config --file $OUT_DIR/.config"
+    case "$LTO" in
+        none) $CFG -e LTO_NONE -d LTO_CLANG -d LTO_CLANG_THIN -d LTO_CLANG_FULL ;;
+        thin) $CFG -d LTO_NONE -e LTO_CLANG -e LTO_CLANG_THIN -d LTO_CLANG_FULL ;;
+        full) $CFG -d LTO_NONE -e LTO_CLANG -d LTO_CLANG_THIN -e LTO_CLANG_FULL ;;
+    esac
+    make O="$OUT_DIR" olddefconfig
+fi
 
 echo "==> Compiling Kernel 6.1..."
-make -j$(nproc) O="$OUT_DIR" 2>&1 | tee "$WORKROOT/build.log" | tail -150
+make -j"$(nproc)" O="$OUT_DIR" $MAKE_GOALS 2>&1 | tee "$WORKROOT/build.log" | tail -150
 
 echo "----------------------------------------"
 echo "Build complete!"
